@@ -4,7 +4,6 @@ import asyncio
 import logging
 import os
 import sqlite3
-import sys
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -27,11 +26,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-BOT_TOKEN: str = os.getenv("TG_BOT_TOKEN", "")
-if not BOT_TOKEN:
-    raise ValueError("TG_BOT_TOKEN не найден в .env")
 
-bot: Bot = Bot(token=BOT_TOKEN)
+BUTTON_TEXT: str = "Зафиксировать клиента"
 dp: Dispatcher = Dispatcher()
 
 
@@ -46,7 +42,7 @@ class ClientForm(StatesGroup):
 def get_main_keyboard() -> ReplyKeyboardMarkup:
     """Возвращает клавиатуру с кнопкой 'Зафиксировать клиента'."""
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Зафиксировать клиента")]],
+        keyboard=[[KeyboardButton(text=BUTTON_TEXT)]],
         resize_keyboard=True,
     )
 
@@ -61,7 +57,7 @@ async def cmd_start(message: Message) -> None:
     logger.info("Пользователь %s запустил бота", message.from_user.id)
 
 
-@dp.message(F.text.lower() == "зафиксировать клиента")
+@dp.message(F.text, F.text.lower() == BUTTON_TEXT.lower())
 async def start_registration(message: Message, state: FSMContext) -> None:
     """Запускает цепочку FSM для регистрации клиента."""
     await state.set_state(ClientForm.client_phone)
@@ -169,27 +165,21 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
         await state.clear()
 
 
-async def on_startup() -> None:
-    """Действия при запуске бота."""
-    logger.info("Бот запущен")
-
-
-async def on_shutdown() -> None:
-    """Действия при остановке бота."""
-    logger.info("Бот останавливается...")
-
-
 async def main() -> None:
     """Точка входа: инициализация БД и запуск polling."""
     init_db()
+
+    token: str = os.getenv("TG_BOT_TOKEN", "")
+    if not token:
+        raise ValueError("TG_BOT_TOKEN не найден в .env")
+    bot: Bot = Bot(token=token)
+
     try:
         await bot.delete_webhook(drop_pending_updates=True)
     except Exception as exc:
         logger.warning("Не удалось сбросить webhook: %s", exc)
 
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-
+    logger.info("Бот запущен")
     await dp.start_polling(bot, skip_updates=True)
 
 
