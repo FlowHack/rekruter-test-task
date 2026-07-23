@@ -15,6 +15,8 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
+from aiogram.exceptions import TelegramNetworkError
+from aiogram.utils.token import TokenValidationError
 from dotenv import load_dotenv
 
 from database import check_client_exists, init_db, save_client, validate_phone
@@ -32,6 +34,9 @@ dp: Dispatcher = Dispatcher()
 
 
 class ClientForm(StatesGroup):
+    # pylint: disable=too-few-public-methods
+    # StatesGroup из aiogram не требует публичных методов,
+    # состояния определяются через атрибуты State()
     """Состояния для опроса данных клиента."""
 
     client_phone = State()
@@ -47,6 +52,14 @@ def get_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def _get_user_id(message: Message) -> int:
+    """Безопасно получает ID пользователя из сообщения."""
+    user = message.from_user
+    if user is None:
+        return 0
+    return user.id
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: Message) -> None:
     """Обрабатывает команду /start."""
@@ -54,7 +67,7 @@ async def cmd_start(message: Message) -> None:
         "Привет! Я бот для фиксации заявок клиентов.",
         reply_markup=get_main_keyboard(),
     )
-    logger.info("Пользователь %s запустил бота", message.from_user.id)
+    logger.info("Пользователь %s запустил бота", _get_user_id(message))
 
 
 @dp.message(F.text & (F.text.lower() == BUTTON_TEXT.lower()))
@@ -66,7 +79,8 @@ async def start_registration(message: Message, state: FSMContext) -> None:
         reply_markup=ReplyKeyboardRemove(),
     )
     logger.info(
-        "Пользователь %s начал регистрацию клиента", message.from_user.id
+        "Пользователь %s начал регистрацию клиента",
+        _get_user_id(message),
     )
 
 
@@ -130,13 +144,14 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
         await message.answer("ФИО не может быть пустым. Введите ФИО клиента:")
         return
 
-    data: dict = await state.get_data()
+    data: dict[str, str | None] = await state.get_data()
     client_phone: str | None = data.get("client_phone")
     realtor_phone: str | None = data.get("realtor_phone")
 
     if not client_phone or not realtor_phone:
         logger.error(
-            "Потеряны данные FSM для пользователя %s", message.from_user.id
+            "Потеряны данные FSM для пользователя %s",
+            _get_user_id(message),
         )
         await message.answer(
             "Произошла ошибка. Начните регистрацию заново.",
@@ -162,9 +177,9 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
             "Клиент уже в работе",
             reply_markup=get_main_keyboard(),
         )
-    except Exception as exc:
+    except sqlite3.Error as exc:
         logger.error(
-            "Ошибка при сохранении клиента %s: %s", client_phone, exc
+            "Ошибка БД при сохранении клиента %s: %s", client_phone, exc
         )
         await message.answer(
             "Произошла ошибка при сохранении. Попробуйте позже.",
@@ -174,7 +189,7 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
         await state.clear()
 
 
-async def on_shutdown(bot: Bot) -> None:
+async def on_shutdown() -> None:
     """Действия при остановке бота."""
     logger.info("Бот останавливается...")
 
@@ -189,19 +204,19 @@ async def main() -> None:
 
     try:
         bot: Bot = Bot(token=token)
-    except Exception as exc:
+    except TokenValidationError as exc:
         logger.error("Неверный формат токена: %s", exc)
         raise
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
-    except Exception as exc:
+    except TelegramNetworkError as exc:
         logger.warning("Не удалось сбросить webhook: %s", exc)
 
     try:
         me = await bot.get_me()
         logger.info("Бот @%s запущен", me.username)
-    except Exception as exc:
+    except TelegramNetworkError as exc:
         logger.error(
             "Не удалось подключиться к Telegram. Проверьте токен и "
             "подключение к интернету: %s", exc
@@ -213,8 +228,8 @@ async def main() -> None:
 
     try:
         await dp.start_polling(bot, skip_updates=True)
-    except Exception as exc:
-        logger.error("Бот остановлен из-за ошибки: %s", exc)
+    except TelegramNetworkError as exc:
+        logger.error("Бот остановлен из-за ошибки сети: %s", exc)
     finally:
         await bot.session.close()
 
