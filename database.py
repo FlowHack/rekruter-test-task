@@ -95,6 +95,10 @@ def validate_phone(raw: str) -> Optional[str]:
     Returns:
         Отформатированный номер или None при неверном формате.
     """
+    # Проверка на недопустимые символы (буквы, подчёркивания и пр.)
+    if re.search(r"[^\d+\s\-()]", raw):
+        return None
+
     digits: str = re.sub(r"\D", "", raw)
 
     if len(digits) == 11 and digits[0] in ("7", "8"):

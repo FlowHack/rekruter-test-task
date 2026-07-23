@@ -197,6 +197,7 @@ async def main() -> None:
             "Не удалось подключиться к Telegram. Проверьте токен и "
             "подключение к интернету: %s", exc
         )
+        await bot.session.close()
         return
 
     dp.shutdown.register(on_shutdown)
@@ -205,6 +206,8 @@ async def main() -> None:
         await dp.start_polling(bot, skip_updates=True)
     except Exception as exc:
         logger.error("Бот остановлен из-за ошибки: %s", exc)
+    finally:
+        await bot.session.close()
 
 
 if __name__ == "__main__":
