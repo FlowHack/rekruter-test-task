@@ -17,7 +17,7 @@ from aiogram.types import (
 )
 from dotenv import load_dotenv
 
-from database import init_db, save_client, validate_phone
+from database import check_client_exists, init_db, save_client, validate_phone
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,6 +82,15 @@ async def process_client_phone(message: Message, state: FSMContext) -> None:
             "Некорректный формат. Пожалуйста, введите номер телефона "
             "в формате +79991234567"
         )
+        return
+
+    if check_client_exists(phone):
+        logger.warning("Дубликат: клиент %s уже существует", phone)
+        await message.answer(
+            "Клиент уже в работе",
+            reply_markup=get_main_keyboard(),
+        )
+        await state.clear()
         return
 
     await state.update_data(client_phone=phone)

@@ -33,6 +33,29 @@ def init_db() -> None:
         raise
 
 
+def check_client_exists(client_phone: str) -> bool:
+    """Проверяет, существует ли клиент с указанным телефоном.
+
+    Args:
+        client_phone: Номер телефона клиента.
+
+    Returns:
+        True если запись существует, иначе False.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.execute(
+                "SELECT 1 FROM clients WHERE client_phone = ?",
+                (client_phone,),
+            )
+            return cursor.fetchone() is not None
+    except sqlite3.Error as exc:
+        logger.error(
+            "Ошибка при проверке дубликата %s: %s", client_phone, exc
+        )
+        return False
+
+
 def save_client(
     client_phone: str, realtor_phone: str, client_fio: str
 ) -> None:
