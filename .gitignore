@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Database
+database.db
+database.db-journal
+
+# AiderDesk
+.aider*
+aider*
