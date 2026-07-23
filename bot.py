@@ -189,8 +189,17 @@ async def main() -> None:
     except Exception as exc:
         logger.warning("Не удалось сбросить webhook: %s", exc)
 
+    try:
+        me = await bot.get_me()
+        logger.info("Бот @%s запущен", me.username)
+    except Exception as exc:
+        logger.error(
+            "Не удалось подключиться к Telegram. Проверьте токен и "
+            "подключение к интернету: %s", exc
+        )
+        return
+
     dp.shutdown.register(on_shutdown)
-    logger.info("Бот запущен")
 
     try:
         await dp.start_polling(bot, skip_updates=True)
