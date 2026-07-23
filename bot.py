@@ -191,7 +191,11 @@ async def main() -> None:
 
     dp.shutdown.register(on_shutdown)
     logger.info("Бот запущен")
-    await dp.start_polling(bot, skip_updates=True)
+
+    try:
+        await dp.start_polling(bot, skip_updates=True)
+    except Exception as exc:
+        logger.error("Бот остановлен из-за ошибки: %s", exc)
 
 
 if __name__ == "__main__":
