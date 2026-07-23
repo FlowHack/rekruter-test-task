@@ -8,7 +8,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-DB_DIR: str = os.path.dirname(os.path.abspath(__file__))
+DB_DIR: str = os.path.dirname(os.path.realpath(__file__))
 DB_PATH: str = os.path.join(DB_DIR, "database.db")
 
 

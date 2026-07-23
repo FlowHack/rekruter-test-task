@@ -57,7 +57,7 @@ async def cmd_start(message: Message) -> None:
     logger.info("Пользователь %s запустил бота", message.from_user.id)
 
 
-@dp.message(F.text, F.text.lower() == BUTTON_TEXT.lower())
+@dp.message(F.text & (F.text.lower() == BUTTON_TEXT.lower()))
 async def start_registration(message: Message, state: FSMContext) -> None:
     """Запускает цепочку FSM для регистрации клиента."""
     await state.set_state(ClientForm.client_phone)
@@ -121,7 +121,7 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
         await message.answer("ФИО не может быть пустым. Введите ФИО клиента:")
         return
 
-    data: dict[str, str] = await state.get_data()
+    data: dict = await state.get_data()
     client_phone: str | None = data.get("client_phone")
     realtor_phone: str | None = data.get("realtor_phone")
 
@@ -165,6 +165,11 @@ async def process_client_fio(message: Message, state: FSMContext) -> None:
         await state.clear()
 
 
+async def on_shutdown(bot: Bot) -> None:
+    """Действия при остановке бота."""
+    logger.info("Бот останавливается...")
+
+
 async def main() -> None:
     """Точка входа: инициализация БД и запуск polling."""
     init_db()
@@ -172,13 +177,19 @@ async def main() -> None:
     token: str = os.getenv("TG_BOT_TOKEN", "")
     if not token:
         raise ValueError("TG_BOT_TOKEN не найден в .env")
-    bot: Bot = Bot(token=token)
+
+    try:
+        bot: Bot = Bot(token=token)
+    except Exception as exc:
+        logger.error("Неверный формат токена: %s", exc)
+        raise
 
     try:
         await bot.delete_webhook(drop_pending_updates=True)
     except Exception as exc:
         logger.warning("Не удалось сбросить webhook: %s", exc)
 
+    dp.shutdown.register(on_shutdown)
     logger.info("Бот запущен")
     await dp.start_polling(bot, skip_updates=True)
 
